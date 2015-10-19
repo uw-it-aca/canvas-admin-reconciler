@@ -104,7 +104,7 @@ class ASTRA():
         except:
             self._log.error('Other error: ' + str(sys.exc_info()[1]))
 
-        return {}
+        return None
 
     def _getAuthz(self, authFilter):
         return self._request('GetAuthz', authFilter)
@@ -270,6 +270,9 @@ class ASTRA():
         authFilter.astraRole._code = 'User'
 
         authz = self._getAuthz(authFilter)
+        if not authz:
+            self._log.error('ASTRA GetAuthz failed. Aborting Canvas admin update.')
+            return
 
         # flag and mark all records deleted to catch ASTRA fallen
         Admin.objects.all().update(queue_id=self._pid, is_deleted=True)
