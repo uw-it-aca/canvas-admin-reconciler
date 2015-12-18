@@ -1,6 +1,17 @@
 from django.db import models
 
 
+class AdminManager(models.Manager):
+    def is_account_admin(self, net_id):
+        try:
+            admin = Admin.objects.get(net_id=net_id,
+                                      role='accountadmin',
+                                      deleted_date__isnull=True)
+            return True
+        except Admin.DoesNotExist:
+            return False
+
+
 class Admin(models.Model):
     """ Represents the provisioned state of an administrative user.
     """
@@ -14,6 +25,8 @@ class Admin(models.Model):
     deleted_date = models.DateTimeField(null=True)
     is_deleted = models.NullBooleanField()
     queue_id = models.CharField(max_length=30, null=True)
+
+    objects = AdminManager()
 
 
 class Account(models.Model):
