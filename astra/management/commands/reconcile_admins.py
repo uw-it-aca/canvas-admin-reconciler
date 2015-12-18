@@ -4,19 +4,21 @@ from django.utils.log import getLogger
 from django.utils.timezone import utc
 from astra.loader import ASTRA, Accounts
 from astra.loader import ASTRAException
+from astra.models import Admin, Account
 from restclients.canvas.admins import Admins as CanvasAdmins
 from restclients.canvas.accounts import Accounts as CanvasAccounts
 from restclients.pws import PWS
 from restclients.exceptions import DataFailureException
-from astra.models import Admin, Account
+from sis_provisioner.management.commands import SISProvisionerCommand
 from optparse import make_option
 import datetime
 
 
-class AncillaryException(Exception): pass
+class AncillaryException(Exception):
+    pass
 
 
-class Command(BaseCommand):
+class Command(SISProvisionerCommand):
     help = "Reconcile ASTRA / Canvas Administrators"
 
     option_list = BaseCommand.option_list + (
@@ -32,19 +34,17 @@ class Command(BaseCommand):
                     default=0, help='Override blocked Canvas admins import of given process id'),
         )
 
-    _canvas_admins = CanvasAdmins()
-    _pws = PWS()
-    _accounts = Accounts()
-    _log = getLogger('astra')
-
-    _canvas_role_mapping = {}
-    for role in settings.ASTRA_ROLE_MAPPING:
-        _canvas_role_mapping[settings.ASTRA_ROLE_MAPPING[role]] = role
-
     def handle(self, *args, **options):
-
         self._options = options
         self._verbosity = int(options.get('verbosity'))
+        self._canvas_admins = CanvasAdmins()
+        self._pws = PWS()
+        self._accounts = Accounts()
+        self._log = getLogger('astra')
+
+        self._canvas_role_mapping = {}
+        for role in settings.ASTRA_ROLE_MAPPING:
+            _canvas_role_mapping[settings.ASTRA_ROLE_MAPPING[role]] = role
 
         if not self._options.get('commit'):
             self._log.info('NOT commiting ASTRA admins.  Only logging what would change.')
@@ -207,6 +207,8 @@ class Command(BaseCommand):
 
         except DataFailureException, err:
             self._log.error('REST ERROR: %s\nAborting.' % err)
+
+        self.update_job()
 
     def _is_ancillary(self, account, canvas_role, canvas_login_id, is_root):
         ancillary = settings.ANCILLARY_CANVAS_ROLES
