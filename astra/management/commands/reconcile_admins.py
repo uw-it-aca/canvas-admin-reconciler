@@ -12,6 +12,7 @@ from restclients.exceptions import DataFailureException
 from sis_provisioner.management.commands import SISProvisionerCommand
 from optparse import make_option
 import datetime
+import time
 
 
 class AncillaryException(Exception):
@@ -42,10 +43,12 @@ class Command(SISProvisionerCommand):
         self._accounts = Accounts()
         self._log = getLogger('astra')
 
+        self._max_retry = 8
+        self._sleep_interval = 20
+
         self._canvas_role_mapping = {}
         for role in settings.ASTRA_ROLE_MAPPING:
-            _canvas_role_mapping[settings.ASTRA_ROLE_MAPPING[role]] = role
-
+            self._canvas_role_mapping[settings.ASTRA_ROLE_MAPPING[role]] = role
         if not self._options.get('commit'):
             self._log.info('NOT commiting ASTRA admins.  Only logging what would change.')
 
@@ -69,8 +72,12 @@ class Command(SISProvisionerCommand):
 
             root_canvas_admins = []
 
-            accounts.append(canvas_accounts.get_account(root_account_id))
-            accounts.extend(canvas_accounts.get_all_sub_accounts(root_account_id))
+            account, sub_accounts = self._retry_with_backoff(
+                lambda :(canvas_accounts.get_account(root_account_id),
+                         canvas_accounts.get_all_sub_accounts(root_account_id)))
+
+            accounts.append(account)
+            accounts.extend(sub_accounts)
             for account in accounts:
                 canvas_id = account.account_id
                 self._shown_canvas_id = canvas_id
@@ -209,6 +216,22 @@ class Command(SISProvisionerCommand):
             self._log.error('REST ERROR: %s\nAborting.' % err)
 
         self.update_job()
+
+    def _retry_with_backoff(self, f):
+        n = 0
+        while True:
+            try:
+                return f()
+            except DataFailureException, err:
+                self._log.error('REST ERROR (%s): %s' % (err.status, err))
+                if n < self._max_retry and err.status in [408, 500, 502, 503, 504]:
+                    n += 1
+                    delay = n * self._sleep_interval
+                    self._log.error('Retry after %s seconds.' % delay)
+                    time.sleep(delay)
+                else:
+                    self._log.error('Aborting.')
+                    raise
 
     def _is_ancillary(self, account, canvas_role, canvas_login_id, is_root):
         ancillary = settings.ANCILLARY_CANVAS_ROLES
