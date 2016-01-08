@@ -9,6 +9,7 @@ from restclients.canvas.admins import Admins as CanvasAdmins
 from restclients.canvas.accounts import Accounts as CanvasAccounts
 from restclients.pws import PWS
 from restclients.exceptions import DataFailureException
+from restclients.util import retry
 from sis_provisioner.management.commands import SISProvisionerCommand
 from optparse import make_option
 import datetime
@@ -35,16 +36,18 @@ class Command(SISProvisionerCommand):
                     default=0, help='Override blocked Canvas admins import of given process id'),
         )
 
+    max_retry = 8
+    sleep_interval = 5
+    retry_status_codes = [408, 500, 502, 503, 504]
+
     def handle(self, *args, **options):
         self._options = options
         self._verbosity = int(options.get('verbosity'))
         self._canvas_admins = CanvasAdmins()
+        self._canvas_accounts = CanvasAccounts()
         self._pws = PWS()
         self._accounts = Accounts()
         self._log = getLogger('astra')
-
-        self._max_retry = 8
-        self._sleep_interval = 20
 
         self._canvas_role_mapping = {}
         for role in settings.ASTRA_ROLE_MAPPING:
@@ -62,19 +65,17 @@ class Command(SISProvisionerCommand):
             if self._verbosity > 0:
                 self._log.info('building sub account list...')
 
-            canvas_accounts = CanvasAccounts()
             accounts = []
             root = options.get('root_account')
-            root_account_id = root if canvas_accounts.valid_canvas_id(root) else canvas_accounts.sis_account_id(root)
+            root_account_id = root if self._canvas_accounts.valid_canvas_id(root) else self._canvas_accounts.sis_account_id(root)
 
             if self._verbosity > 1:
                 self._log.info('get account for id: %s...' % root_account_id)
 
             root_canvas_admins = []
 
-            account, sub_accounts = self._retry_with_backoff(
-                lambda :(canvas_accounts.get_account(root_account_id),
-                         canvas_accounts.get_all_sub_accounts(root_account_id)))
+            account = self.get_account(root_account_id)
+            sub_accounts = self.get_all_sub_accounts(root_account_id)
 
             accounts.append(account)
             accounts.extend(sub_accounts)
@@ -90,7 +91,7 @@ class Command(SISProvisionerCommand):
                     self._shown_id = 'canvas_%s' % canvas_id
 
                 astra_admins = Admin.objects.filter(canvas_id=canvas_id)
-                canvas_admins = self._canvas_admins.get_admins(canvas_id)
+                canvas_admins = self.get_admins(canvas_id)
 
                 if account_model.is_root():
                     root_canvas_admins = canvas_admins
@@ -216,6 +217,21 @@ class Command(SISProvisionerCommand):
             self._log.error('REST ERROR: %s\nAborting.' % err)
 
         self.update_job()
+
+    @retry(DataFailureException, status_codes=[408, 500, 502, 503, 504],
+           tries=max_retry, delay=sleep_interval)
+    def get_admins(canvas_id):
+        return self._canvas_admins.get_admins(canvas_id)
+
+    @retry(DataFailureException, status_codes=[408, 500, 502, 503, 504],
+           tries=max_retry, delay=sleep_interval)
+    def get_account(root_account_id):
+        return self._canvas_accounts.get_account(root_account_id)
+
+    @retry(DataFailureException, status_codes=[408, 500, 502, 503, 504],
+           tries=max_retry, delay=sleep_interval)
+    def get_all_sub_accounts(root_account_id):
+        return self._canvas_accounts.get_all_sub_accounts(root_account_id)
 
     def _retry_with_backoff(self, f):
         n = 0
