@@ -13,7 +13,6 @@ from restclients.util import retry
 from sis_provisioner.management.commands import SISProvisionerCommand
 from optparse import make_option
 import datetime
-import time
 
 
 logger = getLogger('astra')
