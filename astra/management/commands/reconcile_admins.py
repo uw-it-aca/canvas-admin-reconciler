@@ -16,6 +16,9 @@ import datetime
 import time
 
 
+logger = getLogger('astra')
+
+
 class AncillaryException(Exception):
     pass
 
@@ -47,30 +50,29 @@ class Command(SISProvisionerCommand):
         self._canvas_accounts = CanvasAccounts()
         self._pws = PWS()
         self._accounts = Accounts()
-        self._log = getLogger('astra')
 
         self._canvas_role_mapping = {}
         for role in settings.ASTRA_ROLE_MAPPING:
             self._canvas_role_mapping[settings.ASTRA_ROLE_MAPPING[role]] = role
         if not self._options.get('commit'):
-            self._log.info('NOT commiting ASTRA admins.  Only logging what would change.')
+            logger.info('NOT commiting ASTRA admins.  Only logging what would change.')
 
         # Compare table to Canvas reality
         try:
             if self._verbosity > 0:
-                self._log.info('building admin table from ASTRA...')
+                logger.info('building admin table from ASTRA...')
 
             ASTRA({ 'verbosity': self._verbosity }).load_all_admins({ 'override': self._options.get('override_id') })
 
             if self._verbosity > 0:
-                self._log.info('building sub account list...')
+                logger.info('building sub account list...')
 
             accounts = []
             root = options.get('root_account')
             root_account_id = root if self._canvas_accounts.valid_canvas_id(root) else self._canvas_accounts.sis_account_id(root)
 
             if self._verbosity > 1:
-                self._log.info('get account for id: %s...' % root_account_id)
+                logger.info('get account for id: %s...' % root_account_id)
 
             root_canvas_admins = []
 
@@ -97,7 +99,7 @@ class Command(SISProvisionerCommand):
                     root_canvas_admins = canvas_admins
 
                 if self._verbosity > 0 and (len(astra_admins) or len(canvas_admins)):
-                    self._log.info('%d ASTRA and %s Canvas admins in account %s (%s)' %
+                    logger.info('%d ASTRA and %s Canvas admins in account %s (%s)' %
                                    (len(astra_admins), len(canvas_admins),
                                     account.name, account.account_id))
 
@@ -152,7 +154,7 @@ class Command(SISProvisionerCommand):
                         astra_admin.save()
                     else:
                         if self._verbosity > 0:
-                            self._log.info('  %s already in Canvas as %s' % (astra_admin.net_id, astra_admin.role))
+                            logger.info('  %s already in Canvas as %s' % (astra_admin.net_id, astra_admin.role))
 
                         if astra_admin.role in settings.ANCILLARY_CANVAS_ROLES:
                             ancillary = settings.ANCILLARY_CANVAS_ROLES[astra_admin.role]
@@ -176,7 +178,7 @@ class Command(SISProvisionerCommand):
                                 user_role['user_id'] = self._canvas_admins.sis_user_id(astra_admin.reg_id)
                                 self._add_admin(**user_role)
                             elif self._verbosity > 0:
-                                self._log.info('  %s ancillary role %s already in %s'
+                                logger.info('  %s ancillary role %s already in %s'
                                                % (user_role['net_id'],
                                                   user_role['role'],
                                                   user_role['canvas_account_id']))
@@ -188,7 +190,7 @@ class Command(SISProvisionerCommand):
                                  and canvas_admin.in_astra)):
                         if self._is_ancillary(account, canvas_admin.role,
                                               canvas_admin.user.login_id, account_model.is_root()):
-                            self._log.info('preserving ancillary role: %s as %s'
+                            logger.info('preserving ancillary role: %s as %s'
                                            % (canvas_admin.user.login_id,
                                               canvas_admin.role))
 
@@ -201,53 +203,37 @@ class Command(SISProvisionerCommand):
                                                role=canvas_admin.role)
                         except DataFailureException as err:
                             if err.args[1] == 404:
-                                self._log.info('Ancillary role NOT in Canvas: %s as %s'
+                                logger.info('Ancillary role NOT in Canvas: %s as %s'
                                                % (canvas_admin.user.login_id,
                                                   canvas_admin.role))
                             else:
                                 raise
 
             if self._verbosity > 0:
-                self._log.info('Done.')
+                logger.info('Done.')
 
         except ASTRAException, err:
-            self._log.error('ASTRA ERROR: %s\nAborting.' % err)
+            logger.error('ASTRA ERROR: %s\nAborting.' % err)
 
         except DataFailureException, err:
-            self._log.error('REST ERROR: %s\nAborting.' % err)
+            logger.error('REST ERROR: %s\nAborting.' % err)
 
         self.update_job()
 
-    @retry(DataFailureException, status_codes=[408, 500, 502, 503, 504],
-           tries=max_retry, delay=sleep_interval)
+    @retry(DataFailureException, status_codes=retry_status_codes,
+           tries=max_retry, delay=sleep_interval, logger=logger)
     def get_admins(canvas_id):
         return self._canvas_admins.get_admins(canvas_id)
 
-    @retry(DataFailureException, status_codes=[408, 500, 502, 503, 504],
-           tries=max_retry, delay=sleep_interval)
+    @retry(DataFailureException, status_codes=retry_status_codes,
+           tries=max_retry, delay=sleep_interval, logger=logger)
     def get_account(root_account_id):
         return self._canvas_accounts.get_account(root_account_id)
 
-    @retry(DataFailureException, status_codes=[408, 500, 502, 503, 504],
-           tries=max_retry, delay=sleep_interval)
+    @retry(DataFailureException, status_codes=retry_status_codes,
+           tries=max_retry, delay=sleep_interval, logger=logger)
     def get_all_sub_accounts(root_account_id):
         return self._canvas_accounts.get_all_sub_accounts(root_account_id)
-
-    def _retry_with_backoff(self, f):
-        n = 0
-        while True:
-            try:
-                return f()
-            except DataFailureException, err:
-                self._log.error('REST ERROR (%s): %s' % (err.status, err))
-                if n < self._max_retry and err.status in [408, 500, 502, 503, 504]:
-                    n += 1
-                    delay = n * self._sleep_interval
-                    self._log.error('Retry after %s seconds.' % delay)
-                    time.sleep(delay)
-                else:
-                    self._log.error('Aborting.')
-                    raise
 
     def _is_ancillary(self, account, canvas_role, canvas_login_id, is_root):
         ancillary = settings.ANCILLARY_CANVAS_ROLES
@@ -303,7 +289,7 @@ class Command(SISProvisionerCommand):
 
     def _record(self, msg):
         if self._shown_id:
-            self._log.info('reconciling %s (%s)' % (self._shown_id, self._shown_canvas_id))
+            logger.info('reconciling %s (%s)' % (self._shown_id, self._shown_canvas_id))
             self._shown_id = None
 
-        self._log.info(msg)
+        logger.info(msg)
