@@ -9,7 +9,7 @@ from restclients.canvas.admins import Admins as CanvasAdmins
 from restclients.canvas.accounts import Accounts as CanvasAccounts
 from restclients.pws import PWS
 from restclients.exceptions import DataFailureException
-from restclients.util import retry
+from restclients.util.retry import retry
 from sis_provisioner.management.commands import SISProvisionerCommand
 from optparse import make_option
 import datetime
