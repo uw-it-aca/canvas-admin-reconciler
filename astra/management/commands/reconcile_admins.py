@@ -132,8 +132,10 @@ class Command(SISProvisionerCommand):
                                                               is_deleted__isnull=True)) == 0:
                                     user_role['canvas_account_id'] = settings.RESTCLIENTS_CANVAS_ACCOUNT_ID
                                     self._remove_admin(**user_role)
-                            except Admin.DoesNotExist: pass
-                            except KeyError: pass
+                            except Admin.DoesNotExist:
+                                pass
+                            except KeyError:
+                                pass
 
                             astra_admin.deleted_date = datetime.datetime.utcnow().replace(tzinfo=utc)
                             astra_admin.save()
@@ -211,27 +213,29 @@ class Command(SISProvisionerCommand):
             if self._verbosity > 0:
                 logger.info('Done.')
 
-        except ASTRAException, err:
+        except ASTRAException as err:
             logger.error('ASTRA ERROR: %s\nAborting.' % err)
 
-        except DataFailureException, err:
+        except DataFailureException as err:
+            if err.status in retry_status_codes:
+                pass
             logger.error('REST ERROR: %s\nAborting.' % err)
 
         self.update_job()
 
     @retry(DataFailureException, status_codes=retry_status_codes,
            tries=max_retry, delay=sleep_interval, logger=logger)
-    def get_admins(canvas_id):
+    def get_admins(self, canvas_id):
         return self._canvas_admins.get_admins(canvas_id)
 
     @retry(DataFailureException, status_codes=retry_status_codes,
            tries=max_retry, delay=sleep_interval, logger=logger)
-    def get_account(root_account_id):
+    def get_account(self, root_account_id):
         return self._canvas_accounts.get_account(root_account_id)
 
     @retry(DataFailureException, status_codes=retry_status_codes,
            tries=max_retry, delay=sleep_interval, logger=logger)
-    def get_all_sub_accounts(root_account_id):
+    def get_all_sub_accounts(self, root_account_id):
         return self._canvas_accounts.get_all_sub_accounts(root_account_id)
 
     def _is_ancillary(self, account, canvas_role, canvas_login_id, is_root):
