@@ -38,7 +38,7 @@ class Command(SISProvisionerCommand):
                     default=0, help='Override blocked Canvas admins import of given process id'),
         )
 
-    max_retry = 8
+    max_retry = 5
     sleep_interval = 5
     retry_status_codes = [408, 500, 502, 503, 504]
 
@@ -217,9 +217,10 @@ class Command(SISProvisionerCommand):
             logger.error('ASTRA ERROR: %s\nAborting.' % err)
 
         except DataFailureException as err:
-            if err.status in retry_status_codes:
-                pass
-            logger.error('REST ERROR: %s\nAborting.' % err)
+            if err.status in self.retry_status_codes:
+                logger.error('RETRIES EXCEEDED: %s\nAborting.' % err)
+            else:
+                logger.error('REST ERROR: %s\nAborting.' % err)
 
         self.update_job()
 
