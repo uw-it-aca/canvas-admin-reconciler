@@ -2,6 +2,30 @@ from django.db import models
 
 
 class AdminManager(models.Manager):
+    def queue_all(self, queue_id):
+        return super(AdminManager, self).get_query_set().update(
+            queue_id=queue_id, is_deleted=True)
+
+    def queued(self, queue_id=None):
+        if queue_id is not None:
+            return super(AdminManager, self).get_query_set().filter(
+                queue_id=queue_id)
+        else:
+            return super(AdminManager, self).get_query_set().filter(
+                queue_id__isnull=False)
+
+    def dequeue(self, queue_id=None):
+        if queue_id is not None:
+            super(AdminManager, self).get_query_set().filter(
+                queue_id=queue_id).update(queue_id=None)
+        else:
+            super(AdminManager, self).get_query_set().filter(
+                queue_id__isnull=False).update(queue_id=None)
+
+    def get_deleted(self):
+        return super(AdminManager, self).get_query_set().filter(
+            is_deleted__isnull=False)
+
     def is_account_admin(self, net_id):
         try:
             admin = Admin.objects.get(net_id=net_id,

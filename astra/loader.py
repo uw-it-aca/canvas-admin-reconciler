@@ -244,7 +244,7 @@ class ASTRA():
 
     def load_all_admins(self, options={}):
         # loader running?
-        queued = Admin.objects.filter(queue_id__isnull=False)
+        queued = Admin.objects.queued()
         if len(queued):
             # look for pid matching queue_id, adjust gripe accordingly
             try:
@@ -254,9 +254,8 @@ class ASTRA():
             except:
                 override = options.get('override', 0)
                 if override > 0 and override == queued[0].queue_id:
-                    Admin.objects.filter(queue_id=override).update(queue_id=None)
-                    queued = Admin.objects.filter(queue_id__isnull=False)
-                    if len(queued):
+                    Admin.objects.dequeue(queue_id=override)
+                    if len(Admin.objects.queued()):
                         raise ASTRAException('unable to override process %s' % (
                             override))
                 else:
@@ -275,7 +274,7 @@ class ASTRA():
             return
 
         # flag and mark all records deleted to catch ASTRA fallen
-        Admin.objects.all().update(queue_id=self._pid, is_deleted=True)
+        Admin.objects.queue_all(queue_id=self._pid)
 
         # restore records with latest auths
         if 'authCollection' in authz and 'auth' in authz.authCollection:
@@ -309,13 +308,12 @@ class ASTRA():
                     self._log.error('%s\n  AUTH: %s' % (errstr, auth))
 
         # log who fell from ASTRA
-        deleted = Admin.objects.filter(is_deleted__isnull=False)
-        for d in deleted:
+        for d in Admin.objects.get_deleted():
             self._log.info('REMOVE: %s as %s in %s' % (
                 d.net_id, d.role, d.account_id))
 
         # tidy up
-        Admin.objects.all().update(queue_id=None)
+        Admin.objects.dequeue()
 
 
 class Accounts():
