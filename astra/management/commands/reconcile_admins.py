@@ -2,8 +2,7 @@ from django.core.management.base import BaseCommand
 from django.conf import settings
 from django.utils.log import getLogger
 from django.utils.timezone import utc
-from astra.loader import ASTRA, Accounts
-from astra.loader import ASTRAException
+from astra.loader import ASTRA, Accounts, ASTRAException
 from astra.models import Admin, Account
 from restclients.canvas.admins import Admins as CanvasAdmins
 from restclients.canvas.accounts import Accounts as CanvasAccounts
@@ -219,6 +218,7 @@ class Command(SISProvisionerCommand):
         except DataFailureException as err:
             if err.status in self.retry_status_codes:
                 logger.error('RETRIES EXCEEDED: %s\nAborting.' % err)
+                Admin.objects.dequeue()
             else:
                 logger.error('REST ERROR: %s\nAborting.' % err)
 
