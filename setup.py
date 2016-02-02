@@ -18,9 +18,6 @@ setup(
         'django',
         'suds==0.4',
     ],
-    dependency_links = [
-        'http://github.com/uw-it-aca/uw-restclients#egg=RestClients'
-    ],
     license='Apache License, Version 2.0',  # example license
     description='A Django application for UW Canvas LMS admins',
     long_description=README,

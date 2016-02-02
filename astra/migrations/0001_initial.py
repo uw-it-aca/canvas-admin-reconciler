@@ -1,81 +1,50 @@
 # -*- coding: utf-8 -*-
-from south.utils import datetime_utils as datetime
-from south.db import db
-from south.v2 import SchemaMigration
-from django.db import models
+from __future__ import unicode_literals
+
+from django.db import models, migrations
 
 
-class Migration(SchemaMigration):
+class Migration(migrations.Migration):
 
-    def forwards(self, orm):
-        # Adding model 'Admin'
-        db.create_table('astra_admin', (
-            ('id', self.gf('django.db.models.fields.AutoField')(primary_key=True)),
-            ('net_id', self.gf('django.db.models.fields.CharField')(max_length=20)),
-            ('reg_id', self.gf('django.db.models.fields.CharField')(max_length=32)),
-            ('role', self.gf('django.db.models.fields.CharField')(max_length=32)),
-            ('account_id', self.gf('django.db.models.fields.CharField')(max_length=128)),
-            ('canvas_id', self.gf('django.db.models.fields.IntegerField')()),
-            ('added_date', self.gf('django.db.models.fields.DateTimeField')(auto_now_add=True, blank=True)),
-            ('provisioned_date', self.gf('django.db.models.fields.DateTimeField')(null=True)),
-            ('deleted_date', self.gf('django.db.models.fields.DateTimeField')(null=True)),
-            ('is_deleted', self.gf('django.db.models.fields.NullBooleanField')(null=True, blank=True)),
-            ('queue_id', self.gf('django.db.models.fields.CharField')(max_length=30, null=True)),
-        ))
-        db.send_create_signal('astra', ['Admin'])
+    dependencies = [
+    ]
 
-        # Adding model 'Account'
-        db.create_table('astra_account', (
-            ('id', self.gf('django.db.models.fields.AutoField')(primary_key=True)),
-            ('canvas_id', self.gf('django.db.models.fields.IntegerField')(unique=True)),
-            ('sis_id', self.gf('django.db.models.fields.CharField')(max_length=128, unique=True, null=True, blank=True)),
-            ('account_name', self.gf('django.db.models.fields.CharField')(max_length=256)),
-            ('account_short_name', self.gf('django.db.models.fields.CharField')(max_length=128)),
-            ('account_type', self.gf('django.db.models.fields.CharField')(max_length=16)),
-            ('added_date', self.gf('django.db.models.fields.DateTimeField')(auto_now_add=True, blank=True)),
-            ('is_deleted', self.gf('django.db.models.fields.NullBooleanField')(null=True, blank=True)),
-            ('is_blessed_for_course_request', self.gf('django.db.models.fields.NullBooleanField')(null=True, blank=True)),
-            ('queue_id', self.gf('django.db.models.fields.CharField')(max_length=30, null=True)),
-        ))
-        db.send_create_signal('astra', ['Account'])
-
-
-    def backwards(self, orm):
-        # Deleting model 'Admin'
-        db.delete_table('astra_admin')
-
-        # Deleting model 'Account'
-        db.delete_table('astra_account')
-
-
-    models = {
-        'astra.account': {
-            'Meta': {'object_name': 'Account'},
-            'account_name': ('django.db.models.fields.CharField', [], {'max_length': '256'}),
-            'account_short_name': ('django.db.models.fields.CharField', [], {'max_length': '128'}),
-            'account_type': ('django.db.models.fields.CharField', [], {'max_length': '16'}),
-            'added_date': ('django.db.models.fields.DateTimeField', [], {'auto_now_add': 'True', 'blank': 'True'}),
-            'canvas_id': ('django.db.models.fields.IntegerField', [], {'unique': 'True'}),
-            'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
-            'is_blessed_for_course_request': ('django.db.models.fields.NullBooleanField', [], {'null': 'True', 'blank': 'True'}),
-            'is_deleted': ('django.db.models.fields.NullBooleanField', [], {'null': 'True', 'blank': 'True'}),
-            'queue_id': ('django.db.models.fields.CharField', [], {'max_length': '30', 'null': 'True'}),
-            'sis_id': ('django.db.models.fields.CharField', [], {'max_length': '128', 'unique': 'True', 'null': 'True', 'blank': 'True'})
-        },
-        'astra.admin': {
-            'Meta': {'object_name': 'Admin'},
-            'account_id': ('django.db.models.fields.CharField', [], {'max_length': '128'}),
-            'added_date': ('django.db.models.fields.DateTimeField', [], {'auto_now_add': 'True', 'blank': 'True'}),
-            'canvas_id': ('django.db.models.fields.IntegerField', [], {}),
-            'deleted_date': ('django.db.models.fields.DateTimeField', [], {'null': 'True'}),
-            'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
-            'is_deleted': ('django.db.models.fields.NullBooleanField', [], {'null': 'True', 'blank': 'True'}),
-            'net_id': ('django.db.models.fields.CharField', [], {'max_length': '20'}),
-            'provisioned_date': ('django.db.models.fields.DateTimeField', [], {'null': 'True'}),
-            'queue_id': ('django.db.models.fields.CharField', [], {'max_length': '30', 'null': 'True'}),
-            'reg_id': ('django.db.models.fields.CharField', [], {'max_length': '32'}),
-            'role': ('django.db.models.fields.CharField', [], {'max_length': '32'})
-        }
-    }
-
-    complete_apps = ['astra']
+    operations = [
+        migrations.CreateModel(
+            name='Account',
+            fields=[
+                ('id', models.AutoField(verbose_name='ID', serialize=False, auto_created=True, primary_key=True)),
+                ('canvas_id', models.IntegerField(unique=True)),
+                ('sis_id', models.CharField(max_length=128, unique=True, null=True, blank=True)),
+                ('account_name', models.CharField(max_length=256)),
+                ('account_short_name', models.CharField(max_length=128)),
+                ('account_type', models.CharField(max_length=16, choices=[(b'sdb', b'SDB'), (b'adhoc', b'Ad Hoc'), (b'root', b'Root'), (b'test', b'Test')])),
+                ('added_date', models.DateTimeField(auto_now_add=True)),
+                ('is_deleted', models.NullBooleanField()),
+                ('is_blessed_for_course_request', models.NullBooleanField()),
+                ('queue_id', models.CharField(max_length=30, null=True)),
+            ],
+            options={
+            },
+            bases=(models.Model,),
+        ),
+        migrations.CreateModel(
+            name='Admin',
+            fields=[
+                ('id', models.AutoField(verbose_name='ID', serialize=False, auto_created=True, primary_key=True)),
+                ('net_id', models.CharField(max_length=20)),
+                ('reg_id', models.CharField(max_length=32)),
+                ('role', models.CharField(max_length=32)),
+                ('account_id', models.CharField(max_length=128)),
+                ('canvas_id', models.IntegerField()),
+                ('added_date', models.DateTimeField(auto_now_add=True)),
+                ('provisioned_date', models.DateTimeField(null=True)),
+                ('deleted_date', models.DateTimeField(null=True)),
+                ('is_deleted', models.NullBooleanField()),
+                ('queue_id', models.CharField(max_length=30, null=True)),
+            ],
+            options={
+            },
+            bases=(models.Model,),
+        ),
+    ]
