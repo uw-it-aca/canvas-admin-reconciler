@@ -1,7 +1,7 @@
 import re
 import json
 from django.conf import settings
-from django.utils.log import getLogger
+from logging import getLogger
 from django.db.models import Q
 from django.utils.timezone import localtime
 from astra.models import Admin, Account

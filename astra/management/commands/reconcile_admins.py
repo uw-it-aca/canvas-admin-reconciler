@@ -1,6 +1,6 @@
 from django.core.management.base import BaseCommand
 from django.conf import settings
-from django.utils.log import getLogger
+from logging import getLogger
 from django.utils.timezone import utc
 from astra.loader import ASTRA, Accounts, ASTRAException
 from astra.models import Admin, Account
