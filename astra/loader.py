@@ -3,7 +3,7 @@ import re
 import os
 
 from django.conf import settings
-from django.utils.log import getLogger
+from logging import getLogger
 from django.db.utils import IntegrityError
 
 from restclients.models.sws import Person

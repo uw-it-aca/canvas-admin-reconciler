@@ -1,4 +1,4 @@
-from django.utils.log import getLogger
+from logging import getLogger
 from sis_provisioner.management.commands import SISProvisionerCommand
 from restclients.exceptions import DataFailureException
 from astra.loader import Accounts
