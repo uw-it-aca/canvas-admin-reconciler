@@ -265,11 +265,19 @@ class Command(SISProvisionerCommand):
 
         if self._options.get('commit'):
             prefix = 'ADDING'
-            self._canvas_admins.create_admin(kwargs['canvas_account_id'],
-                                             kwargs['user_id'],
-                                             kwargs['role'])
+            try:
+                self._canvas_admins.create_admin(
+                    kwargs['canvas_account_id'],
+                    kwargs['user_id'],
+                    kwargs['role'])
+            except DataFailureException as err:
+                if err.status == 404:  # Non-personal regid?
+                    prefix = "ADD FAIL: MISSING USER %s" % (kwargs['user_id'])
+                else:
+                    raise
 
-        self._record('  %s: %s as %s' % (prefix, kwargs['net_id'], kwargs['role']))
+        self._record('  %s: %s as %s' % (
+            prefix, kwargs['net_id'], kwargs['role']))
 
     def _remove_admin(self, **kwargs):
         action = 'WOULD DELETE'
@@ -282,7 +290,7 @@ class Command(SISProvisionerCommand):
                 self._canvas_admins.delete_admin(kwargs['canvas_account_id'],
                                                  kwargs['user_id'],
                                                  kwargs['role'])
-            except DataFailureException, err:
+            except DataFailureException as err:
                 if err.status == 404:  # Non-personal regid?
                     action = "ALREADY DELETED"
                 else:
