@@ -6,7 +6,6 @@ from django.conf import settings
 from logging import getLogger
 from django.db.utils import IntegrityError
 
-from restclients.models.sws import Person
 from restclients.models.canvas import CanvasUser
 from restclients.canvas.users import Users as CanvasUsers
 from restclients.canvas.accounts import Accounts as CanvasAccounts
@@ -22,7 +21,8 @@ from suds import WebFault
 from astra.models import Admin, Account
 from sis_provisioner.models import User
 from sis_provisioner.loader import load_user
-from sis_provisioner.policy import UserPolicy
+from sis_provisioner.dao.user import get_person_by_netid, user_fullname,\
+    user_email
 
 import urllib2
 import socket
@@ -85,7 +85,6 @@ class ASTRA():
         self._astra = Client(settings.ASTRA_WSDL,
                              transport=HTTPSTransportV3())
         # prepare to map spans of control to campus and college resource values
-        self._user_policy = UserPolicy()
         self._campuses = get_all_campuses()
         self._colleges = get_all_colleges()
         self._pid = os.getpid()
@@ -123,20 +122,20 @@ class ASTRA():
             User.objects.get(reg_id=regid)
         except User.DoesNotExist:
             try:
-                person = self._user_policy.get_person_by_netid(netid)
-                name = person.full_name if (
-                    isinstance(person, Person)) else person.display_name
+                person = get_person_by_netid(netid)
 
-                self._log.info('Provisioning admin: %s, %s, %s)' % (
-                    person.uwnetid, person.uwregid, name))
+                self._log.info('Provisioning admin: %s (%s)' % (
+                    person.uwnetid, person.uwregid))
 
                 canvas = CanvasUsers()
                 try:
                     user = canvas.get_user_by_sis_id(person.uwregid)
                 except DataFailureException:
-                    user = canvas.create_user(CanvasUser(name=name,
-                                              login_id=person.uwnetid,
-                                              sis_user_id=person.uwregid))
+                    user = canvas.create_user(
+                        CanvasUser(name=user_fullname(person),
+                                   login_id=person.uwnetid,
+                                   sis_user_id=person.uwregid,
+                                   email=user_email(person)))
 
                 load_user(person)
 
