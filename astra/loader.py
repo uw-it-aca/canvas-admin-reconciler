@@ -22,7 +22,7 @@ from sis_provisioner.dao.account import get_all_campuses, get_all_colleges,\
 from sis_provisioner.dao.user import get_person_by_netid, user_fullname,\
     user_email
 from sis_provisioner.dao.canvas import get_user_by_sis_id, create_user,\
-    get_account_by_id, get_all_sub_accounts
+    get_account_by_id, get_account_by_sis_id, get_all_sub_accounts
 
 import urllib2
 import socket
@@ -236,7 +236,7 @@ class ASTRA():
         sis_id = ':'.join(id)
 
         if sis_id not in self._canvas_ids:
-            canvas_account = CanvasAccounts().get_account_by_sis_id(sis_id)
+            canvas_account = get_account_by_sis_id(sis_id)
             self._canvas_ids[sis_id] = canvas_account.account_id
 
         return (sis_id, self._canvas_ids[sis_id])
