@@ -124,7 +124,7 @@ class ASTRA():
             try:
                 person = get_person_by_netid(netid)
 
-                self._log.info('Provisioning admin: %s (%s))' % (
+                self._log.info('Provisioning admin: %s (%s)' % (
                     person.uwnetid, person.uwregid))
 
                 try:
