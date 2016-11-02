@@ -6,23 +6,23 @@ from django.conf import settings
 from logging import getLogger
 from django.db.utils import IntegrityError
 
+from astra.models import Admin, Account
 from restclients.models.sws import Person
 from restclients.models.canvas import CanvasUser
-from restclients.canvas.users import Users as CanvasUsers
-from restclients.canvas.accounts import Accounts as CanvasAccounts
-from restclients.sws.campus import get_all_campuses
-from restclients.sws.college import get_all_colleges
-from restclients.sws.department import get_departments_by_college
 from restclients.exceptions import DataFailureException
 
 from suds.client import Client
 from suds.transport.http import HttpTransport
 from suds import WebFault
 
-from astra.models import Admin, Account
 from sis_provisioner.models import User
 from sis_provisioner.loader import load_user
-from sis_provisioner.policy import UserPolicy
+from sis_provisioner.dao.account import get_all_campuses, get_all_colleges,\
+    get_departments_by_college
+from sis_provisioner.dao.user import get_person_by_netid, user_fullname,\
+    user_email
+from sis_provisioner.dao.canvas import get_user_by_sis_id, create_user,\
+    get_account_by_id, get_all_sub_accounts
 
 import urllib2
 import socket
@@ -85,7 +85,6 @@ class ASTRA():
         self._astra = Client(settings.ASTRA_WSDL,
                              transport=HTTPSTransportV3())
         # prepare to map spans of control to campus and college resource values
-        self._user_policy = UserPolicy()
         self._campuses = get_all_campuses()
         self._colleges = get_all_colleges()
         self._pid = os.getpid()
@@ -123,20 +122,20 @@ class ASTRA():
             User.objects.get(reg_id=regid)
         except User.DoesNotExist:
             try:
-                person = self._user_policy.get_person_by_netid(netid)
-                name = person.full_name if (
-                    isinstance(person, Person)) else person.display_name
+                person = get_person_by_netid(netid)
 
-                self._log.info('Provisioning admin: %s, %s, %s)' % (
-                    person.uwnetid, person.uwregid, name))
+                self._log.info('Provisioning admin: %s (%s))' % (
+                    person.uwnetid, person.uwregid))
 
-                canvas = CanvasUsers()
                 try:
-                    user = canvas.get_user_by_sis_id(person.uwregid)
-                except DataFailureException:
-                    user = canvas.create_user(CanvasUser(name=name,
-                                              login_id=person.uwnetid,
-                                              sis_user_id=person.uwregid))
+                    user = get_user_by_sis_id(person.uwregid)
+                except DataFailureException as err:
+                    if err.status == 404:
+                        user = create_user(CanvasUser(
+                            name=user_fullname(person),
+                            login_id=person.uwnetid,
+                            sis_user_id=person.uwregid,
+                            email=user_email(person)))
 
                 load_user(person)
 
@@ -270,7 +269,8 @@ class ASTRA():
 
         authz = self._getAuthz(authFilter)
         if not authz:
-            self._log.error('ASTRA GetAuthz failed. Aborting Canvas admin update.')
+            self._log.error(
+                'ASTRA GetAuthz failed. Aborting Canvas admin update.')
             return
 
         # flag and mark all records deleted to catch ASTRA fallen
@@ -305,7 +305,7 @@ class ASTRA():
                         raise ASTRAException("Missing required span of control: %s" % (auth.party))
 
                 except ASTRAException, errstr:
-                    self._log.error('%s\n  AUTH: %s' % (errstr, auth))
+                    self._log.error('%s\n AUTH: %s' % (errstr, auth))
 
         # log who fell from ASTRA
         for d in Admin.objects.get_deleted():
@@ -320,7 +320,6 @@ class Accounts():
     """Load account table with Canvas accounts
     """
     def __init__(self):
-        self._accounts = CanvasAccounts()
         self._re_sis = re.compile(r'^%s:(%s)(:[^:]+){0,3}$' % (
             settings.SIS_IMPORT_ROOT_ACCOUNT_ID,
             '|'.join([c.label.lower() for c in get_all_campuses()])))
@@ -328,8 +327,8 @@ class Accounts():
 
     def load_all_accounts(self):
         root_id = settings.RESTCLIENTS_CANVAS_ACCOUNT_ID
-        accounts = [self._accounts.get_account(root_id)]
-        accounts.extend(self._accounts.get_all_sub_accounts(root_id))
+        accounts = [get_account(root_id)]
+        accounts.extend(get_all_sub_accounts(root_id))
 
         Account.objects.all().update(is_deleted=True)
 
@@ -361,8 +360,9 @@ class Accounts():
         try:
             a.save()
         except IntegrityError, err:
-            self._log.error('ACCOUNT LOAD FAILED: canvas_id = %s, sis_id = %s, name = "%s": %s'
-                            % (account.account_id, sis_id, account.name, err))
+            self._log.error(
+                'ACCOUNT LOAD FAIL: canvas_id: %s, sis_id: %s, %s' % (
+                    account.account_id, sis_id, err))
             raise
 
         return a
