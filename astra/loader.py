@@ -16,7 +16,6 @@ from suds.transport.http import HttpTransport
 from suds import WebFault
 
 from sis_provisioner.models import User
-from sis_provisioner.loader import load_user
 from sis_provisioner.dao.account import get_all_campuses, get_all_colleges,\
     get_departments_by_college, account_sis_id
 from sis_provisioner.dao.user import get_person_by_netid, user_fullname,\
@@ -137,7 +136,7 @@ class ASTRA():
                             sis_user_id=person.uwregid,
                             email=user_email(person)))
 
-                load_user(person)
+                User.objects.add_user(person)
 
             except Exception, err:
                 self._log.info('Skipped admin: %s (%s)' % (netid, err))
